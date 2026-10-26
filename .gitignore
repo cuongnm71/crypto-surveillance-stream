@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+
+# Pytest & Mypy & Ruff caches
+.pytest_cache
+pytest-cache-files-*
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov/
+
+# Spark & Local Data Volumes
+data/
+checkpoints/
+spark-warehouse/
+derby.log
+metastore_db/
+
+# dbt artifacts
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# AI Agent Rules & Internal Planning Documents
+GEMINI.md
+AGENTS.md
+CLAUDE.md
+CONSTRAINTS.md
+implementation_plan.md
+plan.md
+todo.md
+tasks/
