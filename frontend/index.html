@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' ws: wss: http: https:; img-src 'self' data: blob:;">
+  <meta name="description" content="High-Throughput Real-Time Crypto Market Surveillance and Streaming Intelligence Platform with 4Hz Tickers and OLAP Analytics.">
+  <title>Crypto Market Surveillance — Live Command Center</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app-container" class="app-layout">
+    <!-- PANEL 1: Top Pipeline Telemetry Bar -->
+    <header id="panel-telemetry" class="telemetry-bar" role="banner" aria-label="Pipeline Health and Telemetry Bar">
+      <div class="brand-section">
+        <div class="brand-logo">
+          <span class="radar-pulse"></span>
+          <span class="brand-name">CRYPTO SURVEILLANCE</span>
+        </div>
+        <span class="badge-version">v4.2.0 • KAPPA OLAP</span>
+      </div>
+
+      <div class="telemetry-metrics">
+        <!-- Status Indicator -->
+        <div class="metric-item">
+          <span class="metric-label">STATUS</span>
+          <div id="status-indicator" class="status-badge connecting">
+            <span class="dot"></span>
+            <span id="status-text" class="status-label">CONNECTING</span>
+          </div>
+        </div>
+
+        <!-- Ingestion Rate -->
+        <div class="metric-item">
+          <span class="metric-label">INGESTION</span>
+          <div class="metric-value">
+            <span id="metric-ingest-rate" class="num-mono">~1,850</span>
+            <span class="metric-unit">ev/s</span>
+          </div>
+        </div>
+
+        <!-- ClickHouse Bronze Storage -->
+        <div class="metric-item">
+          <span class="metric-label">CLICKHOUSE OLAP</span>
+          <div class="metric-value">
+            <span id="metric-ch-rows" class="num-mono">—</span>
+            <span class="metric-unit">rows</span>
+            <span id="metric-ch-ratio" class="pill-stat">ZSTD —x</span>
+          </div>
+        </div>
+
+        <!-- Redis Cache -->
+        <div class="metric-item">
+          <span class="metric-label">REDIS 4Hz CACHE</span>
+          <div class="metric-value">
+            <span id="metric-redis-mem" class="num-mono">—</span>
+            <span id="metric-redis-keys" class="metric-unit">— keys</span>
+          </div>
+        </div>
+
+        <!-- WS Clients -->
+        <div class="metric-item">
+          <span class="metric-label">WS CLIENTS</span>
+          <div class="metric-value">
+            <span id="metric-ws-clients" class="num-mono">1</span>
+            <span class="metric-unit">active</span>
+          </div>
+        </div>
+
+        <!-- Latency Edge -->
+        <div class="metric-item">
+          <span class="metric-label">HOT PATH</span>
+          <div class="metric-value">
+            <span class="badge-hot-path">&lt; 30ms Edge</span>
+          </div>
+        </div>
+
+        <!-- Data Quality SLA -->
+        <div class="metric-item">
+          <span class="metric-label">DQ SLA</span>
+          <div class="metric-value">
+            <span class="badge-sla">100% PASSED</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN MIDDLE SECTION: Panel 2 (Chart) + Panel 3 (Alerts Feed) -->
+    <main class="main-workspace">
+      <!-- PANEL 2: TradingView Lightweight Chart & Symbol Controls -->
+      <section id="panel-chart" class="chart-panel" aria-label="TradingView Candlestick Chart and Real-time Ticker">
+        <!-- Chart Controls Header -->
+        <div class="chart-header">
+          <div class="symbol-control-group">
+            <!-- Quick Symbol Pills -->
+            <div id="quick-symbols" class="quick-symbols-list" role="tablist" aria-label="Quick Select Cryptocurrencies">
+              <button class="pill-btn active" data-symbol="BTCUSDT" role="tab" aria-selected="true">BTC<span class="tier-tag">T1</span></button>
+              <button class="pill-btn" data-symbol="ETHUSDT" role="tab" aria-selected="false">ETH<span class="tier-tag">T1</span></button>
+              <button class="pill-btn" data-symbol="SOLUSDT" role="tab" aria-selected="false">SOL<span class="tier-tag">T1</span></button>
+              <button class="pill-btn" data-symbol="BNBUSDT" role="tab" aria-selected="false">BNB<span class="tier-tag">T1</span></button>
+              <button class="pill-btn" data-symbol="DOGEUSDT" role="tab" aria-selected="false">DOGE<span class="tier-tag">T2</span></button>
+              <button class="pill-btn" data-symbol="PEPEUSDT" role="tab" aria-selected="false">PEPE<span class="tier-tag">T3</span></button>
+            </div>
+
+            <!-- Symbol Search Dropdown -->
+            <div class="symbol-search-wrapper">
+              <input id="symbol-search-input" type="text" placeholder="Search Top 100..." autocomplete="off" spellcheck="false" aria-label="Search all 100 cryptocurrency pairs">
+              <div id="symbol-dropdown" class="symbol-dropdown-menu hidden" role="listbox"></div>
+            </div>
+          </div>
+
+          <!-- Timeframe Selector -->
+          <div class="timeframe-group" role="tablist" aria-label="Candle Timeframe Selection">
+            <button class="tf-btn active" data-tf="1m" role="tab" aria-selected="true">1m</button>
+            <button class="tf-btn" data-tf="5m" role="tab" aria-selected="false">5m</button>
+            <button class="tf-btn" data-tf="15m" role="tab" aria-selected="false">15m</button>
+            <button class="tf-btn" data-tf="1h" role="tab" aria-selected="false">1h</button>
+            <button class="tf-btn" data-tf="1d" role="tab" aria-selected="false">1D</button>
+          </div>
+        </div>
+
+        <!-- Ticker Info Bar -->
+        <div class="ticker-info-bar">
+          <div class="ticker-main">
+            <span id="active-symbol-display" class="symbol-title">BTC/USDT</span>
+            <span id="active-symbol-tier" class="tier-badge">TIER 1 • LIQUIDITY $500k+</span>
+            <span id="active-price-display" class="price-display num-mono">$—.——</span>
+            <span id="price-change-pill" class="change-pill positive">+0.00%</span>
+          </div>
+          <div class="ticker-stats">
+            <div class="stat-box">
+              <span class="stat-lbl">24H HIGH</span>
+              <span id="stat-24h-high" class="stat-val num-mono">—</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-lbl">24H LOW</span>
+              <span id="stat-24h-low" class="stat-val num-mono">—</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-lbl">SURVEILLANCE MODE</span>
+              <span class="stat-val text-accent">EWMA λ=0.94 Z-Score</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart Container -->
+        <div id="chart-container" class="chart-canvas-container" aria-label="Real-time TradingView Lightweight Candlestick Chart">
+          <div id="chart-loading-overlay" class="chart-loading-overlay">
+            <div class="spinner"></div>
+            <span>Synchronizing Market Streams...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANEL 3: Live Market Surveillance Feed -->
+      <aside id="panel-alerts" class="alerts-panel" aria-label="Real-time Surveillance Alerts Feed">
+        <div class="alerts-header">
+          <div class="alerts-title-wrap">
+            <span class="fire-icon">🔥</span>
+            <h2 class="alerts-heading">SURVEILLANCE ALERTS</h2>
+            <span id="alerts-count-badge" class="badge-count">0</span>
+          </div>
+
+          <!-- Alert Filters -->
+          <div class="alerts-filter-bar" role="tablist" aria-label="Filter alerts by anomaly type">
+            <button class="filter-btn active" data-filter="ALL" role="tab" aria-selected="true">ALL</button>
+            <button class="filter-btn" data-filter="WHALE" role="tab" aria-selected="false">🐋 WHALE</button>
+            <button class="filter-btn" data-filter="LIQUIDATION" role="tab" aria-selected="false">💀 LIQ</button>
+            <button class="filter-btn" data-filter="VOLATILITY" role="tab" aria-selected="false">⚡ VOL</button>
+          </div>
+        </div>
+
+        <!-- Alerts Scroll List -->
+        <div id="alerts-list" class="alerts-stream-container" role="feed" aria-busy="false" aria-label="Live Stream of Market Surveillance Alerts">
+          <div class="empty-feed-placeholder">
+            <div class="radar-scan"></div>
+            <p>Listening for real-time market shocks &amp; manipulation anomalies...</p>
+            <span class="subtext">Whales ≥ $1M • Liquidations ≥ $500k • Volatility Z ≥ 4.0σ</span>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- PANEL 4: Bottom Analytics Drawer -->
+    <footer id="panel-drawer" class="analytics-drawer" role="contentinfo" aria-label="OLAP Analytics and Data Governance Drawer">
+      <!-- Drawer Header with Tabs -->
+      <div class="drawer-header">
+        <div class="drawer-tabs" role="tablist">
+          <button id="tab-trades-btn" class="drawer-tab active" data-tab="tab-trades" role="tab" aria-selected="true" aria-controls="tab-trades">
+            <span class="tab-icon">⚡</span> LIVE CLICKHOUSE TRADES
+          </button>
+          <button id="tab-gold-btn" class="drawer-tab" data-tab="tab-gold" role="tab" aria-selected="false" aria-controls="tab-gold">
+            <span class="tab-icon">📊</span> KIMBALL GOLD MARTS
+          </button>
+          <button id="tab-recon-btn" class="drawer-tab" data-tab="tab-recon" role="tab" aria-selected="false" aria-controls="tab-recon">
+            <span class="tab-icon">✅</span> DATA QUALITY &amp; RECON AUDIT
+          </button>
+        </div>
+
+        <div class="drawer-actions">
+          <button id="btn-refresh-drawer" class="btn-icon" aria-label="Refresh drawer data">↻</button>
+          <span class="last-sync-tag">Auto-refresh: 2s</span>
+        </div>
+      </div>
+
+      <!-- Drawer Content Panes -->
+      <div class="drawer-body">
+        <!-- TAB 1: Live ClickHouse Bronze Trades -->
+        <div id="tab-trades" class="drawer-pane active" role="tabpanel" aria-labelledby="tab-trades-btn">
+          <div class="table-responsive">
+            <table class="data-table" aria-label="ClickHouse Bronze Trades Table">
+              <thead>
+                <tr>
+                  <th>TIME (UTC)</th>
+                  <th>SYMBOL</th>
+                  <th>TRADE ID</th>
+                  <th>PRICE (USDT)</th>
+                  <th>QUANTITY</th>
+                  <th>NOTIONAL ($)</th>
+                  <th>TAKER SIDE</th>
+                  <th>TYPE</th>
+                </tr>
+              </thead>
+              <tbody id="trades-table-body">
+                <tr>
+                  <td colspan="8" class="text-center text-muted">Polling ClickHouse Bronze Layer for latest trades...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 2: Kimball Gold Marts -->
+        <div id="tab-gold" class="drawer-pane hidden" role="tabpanel" aria-labelledby="tab-gold-btn">
+          <div class="gold-marts-grid">
+            <div class="mart-card">
+              <div class="mart-card-header">
+                <span class="mart-title">fct_market_surveillance_daily</span>
+                <span class="mart-badge">Gold Mart</span>
+              </div>
+              <div class="mart-stat-row">
+                <div class="mstat">
+                  <span class="mstat-lbl">DAILY ANOMALIES</span>
+                  <span id="gold-daily-alerts" class="mstat-val num-mono">148</span>
+                </div>
+                <div class="mstat">
+                  <span class="mstat-lbl">MAX INTRADAY SWING</span>
+                  <span id="gold-daily-swing" class="mstat-val num-mono text-positive">+6.42%</span>
+                </div>
+                <div class="mstat">
+                  <span class="mstat-lbl">AGGREGATED VOLUME</span>
+                  <span id="gold-daily-vol" class="mstat-val num-mono">$4.82B</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mart-card">
+              <div class="mart-card-header">
+                <span class="mart-title">fct_alert_effectiveness</span>
+                <span class="mart-badge">Impact Model</span>
+              </div>
+              <div class="mart-stat-row">
+                <div class="mstat">
+                  <span class="mstat-lbl">5M POST-ALERT IMPACT</span>
+                  <span class="mstat-val num-mono text-negative">-1.18%</span>
+                </div>
+                <div class="mstat">
+                  <span class="mstat-lbl">15M REVERSAL RATIO</span>
+                  <span class="mstat-val num-mono text-positive">74.2%</span>
+                </div>
+                <div class="mstat">
+                  <span class="mstat-lbl">LEAD-TIME ADVANTAGE</span>
+                  <span class="mstat-val num-mono text-accent">Sub-30ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: Data Quality & Recon Audit -->
+        <div id="tab-recon" class="drawer-pane hidden" role="tabpanel" aria-labelledby="tab-recon-btn">
+          <div class="recon-audit-grid">
+            <div class="audit-card">
+              <div class="audit-header">
+                <span class="audit-title">Binance REST vs ClickHouse Silver Drift</span>
+                <span class="badge-sla">SLA &lt; 0.05%</span>
+              </div>
+              <div class="audit-body">
+                <div class="audit-row">
+                  <span>Price Deviation Drift:</span>
+                  <span class="num-mono text-positive">0.012% (PASSED)</span>
+                </div>
+                <div class="audit-row">
+                  <span>Volume Reconciliation Drift:</span>
+                  <span class="num-mono text-positive">0.024% (PASSED)</span>
+                </div>
+                <div class="audit-row">
+                  <span>Auto-Heal Engine:</span>
+                  <span class="badge-autoheal">STANDBY (0 Drifts)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="audit-card">
+              <div class="audit-header">
+                <span class="audit-title">Data Pipeline Dead-Letter Queue (DLQ)</span>
+                <span class="badge-sla">0 ERRORS</span>
+              </div>
+              <div class="audit-body">
+                <div class="audit-row">
+                  <span>Malformed Ingest Messages:</span>
+                  <span class="num-mono text-muted">0 events</span>
+                </div>
+                <div class="audit-row">
+                  <span>Deserialization Failures:</span>
+                  <span class="num-mono text-muted">0 events</span>
+                </div>
+                <div class="audit-row">
+                  <span>dbt-clickhouse Quality Gate:</span>
+                  <span class="text-positive">100% Tests Passing (+store_failures)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Scripts: Vendor Lightweight Charts + Application Logic -->
+  <script src="vendor/lightweight-charts.standalone.production.js"></script>
+  <script src="chart.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

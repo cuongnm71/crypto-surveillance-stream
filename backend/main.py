@@ -6,6 +6,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import clickhouse_connect
@@ -13,6 +14,7 @@ import redis.asyncio as aioredis
 import uvicorn
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.routes.api import router as api_router
@@ -156,6 +158,10 @@ def create_app() -> FastAPI:
         except Exception as e:
             logger.debug("WebSocket client error: %s", e)
             ws_hub.disconnect(websocket)
+
+    frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+    if frontend_dir.is_dir():
+        app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
 
     return app
 
