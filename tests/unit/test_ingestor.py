@@ -63,6 +63,23 @@ class TestBinanceIngestorParsing:
         assert trade.symbol == "ETHUSDT"
         assert trade.side == TradeSide.BUY
 
+    def test_parse_agg_trade_unwraps_combined_stream(self) -> None:
+        """Verify aggTrade wrapped in Binance combined stream format is parsed seamlessly."""
+        combined_payload = (
+            b'{"stream":"btcusdt@aggTrade","data":{"e":"aggTrade","E":1700000000000,'
+            b'"s":"BTCUSDT","a":777888,"p":"69000.00","q":"2.5","f":10,"l":11,'
+            b'"T":1700000000000,"m":false}}'
+        )
+        ingestor = BinanceIngestor()
+        trade = ingestor.parse_agg_trade(combined_payload)
+
+        assert trade is not None
+        assert trade.symbol == "BTCUSDT"
+        assert trade.trade_id == "777888"
+        assert trade.price == 69000.00
+        assert trade.qty == 2.5
+        assert trade.side == TradeSide.BUY
+
     def test_parse_agg_trade_deduplication(self) -> None:
         """Verify duplicate aggTrade IDs are ignored on subsequent parses."""
         ingestor = BinanceIngestor()

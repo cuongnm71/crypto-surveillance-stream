@@ -113,6 +113,26 @@ _force_wire_decoder = msgspec.json.Decoder(BinanceForceOrderWire)
 _ticker_wire_decoder = msgspec.json.Decoder(BinanceMiniTickerWire)
 
 
+class BinanceCombinedWire(msgspec.Struct, kw_only=True):
+    """Wire representation of Binance combined stream wrapper."""
+
+    stream: str
+    data: msgspec.Raw
+
+
+_combined_wire_decoder = msgspec.json.Decoder(BinanceCombinedWire)
+
+
+def _extract_payload(raw_bytes: bytes) -> bytes:
+    """Unwrap inner payload if message arrives in combined stream format."""
+    if b'"stream"' in raw_bytes and b'"data"' in raw_bytes:
+        try:
+            return bytes(_combined_wire_decoder.decode(raw_bytes).data)
+        except Exception:
+            return raw_bytes
+    return raw_bytes
+
+
 class BinanceIngestor:
     """Manages Binance WebSocket streaming, zero-copy parsing, and dual-path routing."""
 
@@ -151,6 +171,7 @@ class BinanceIngestor:
 
         Returns None if parsing fails or trade is a duplicate from rotation.
         """
+        raw_bytes = _extract_payload(raw_bytes)
         try:
             wire = _trade_wire_decoder.decode(raw_bytes)
         except Exception:
@@ -190,6 +211,7 @@ class BinanceIngestor:
 
     def parse_force_order(self, raw_bytes: bytes) -> RawLiquidationEvent | None:
         """Parse raw forceOrder JSON bytes into canonical RawLiquidationEvent."""
+        raw_bytes = _extract_payload(raw_bytes)
         try:
             wire = _force_wire_decoder.decode(raw_bytes)
         except Exception:
@@ -218,6 +240,7 @@ class BinanceIngestor:
 
     def parse_mini_ticker(self, raw_bytes: bytes) -> tuple[str, dict[str, str]] | None:
         """Parse raw 24hrMiniTicker JSON bytes and update conflation dictionary."""
+        raw_bytes = _extract_payload(raw_bytes)
         try:
             wire = _ticker_wire_decoder.decode(raw_bytes)
         except Exception:
@@ -333,3 +356,120 @@ class BinanceIngestor:
                 break
             except Exception as e:
                 logger.warning("Error in 4Hz conflation pipeline: %s", e)
+
+    async def run_live(
+        self,
+        symbols: list[str] | None = None,
+        duration_seconds: float | None = None,
+        ws_url: str | None = None,
+    ) -> int:
+        """Connect to Binance WebSocket, stream real trades, and dispatch to Kafka/Redis."""
+        import websockets
+
+        target_symbols = [s.upper() for s in (symbols or ["BTCUSDT", "ETHUSDT", "SOLUSDT"])]
+        if ws_url is None:
+            if len(target_symbols) == 1:
+                stream_name = f"{target_symbols[0].lower()}@aggTrade"
+                ws_url = f"wss://stream.binance.com:9443/ws/{stream_name}"
+            else:
+                streams = "/".join(f"{s.lower()}@aggTrade" for s in target_symbols)
+                ws_url = f"wss://stream.binance.com:9443/stream?streams={streams}"
+
+        logger.info("Connecting to Binance WebSocket: %s", ws_url)
+        self.start_conflation()
+        trade_count = 0
+        start_time = time.monotonic()
+
+        try:
+            async with websockets.connect(
+                ws_url,
+                ping_interval=20,
+                ping_timeout=10,
+                close_timeout=5,
+            ) as ws:
+                logger.info("WebSocket connected. Streaming real market trades...")
+                while True:
+                    if duration_seconds is not None:
+                        elapsed = time.monotonic() - start_time
+                        if elapsed >= duration_seconds:
+                            logger.info(
+                                "Ingestion reached duration limit of %.1fs", duration_seconds
+                            )
+                            break
+
+                    try:
+                        timeout = 2.0
+                        if duration_seconds is not None:
+                            remaining = duration_seconds - (time.monotonic() - start_time)
+                            timeout = max(0.1, min(2.0, remaining))
+                        msg = await asyncio.wait_for(ws.recv(), timeout=timeout)
+                        raw_bytes = msg.encode() if isinstance(msg, str) else msg
+                        trade = await self.handle_trade_event(raw_bytes)
+                        if trade is not None:
+                            trade_count += 1
+                            if trade_count % 50 == 0 or trade_count == 1:
+                                side_str = (
+                                    trade.side.value
+                                    if hasattr(trade.side, "value")
+                                    else str(trade.side)
+                                )
+                                logger.info(
+                                    "Ingested trade #%d: %s price=%.2f qty=%.4f side=%s",
+                                    trade_count,
+                                    trade.symbol,
+                                    trade.price,
+                                    trade.qty,
+                                    side_str,
+                                )
+                    except TimeoutError:
+                        if (
+                            duration_seconds is not None
+                            and (time.monotonic() - start_time) >= duration_seconds
+                        ):
+                            break
+                        continue
+        finally:
+            await self.stop()
+
+        logger.info("Live stream completed. Ingested %d trades.", trade_count)
+        return trade_count
+
+
+async def main() -> None:
+    """CLI entrypoint for running Binance Ingestor live."""
+    import argparse
+
+    import aiokafka.codec
+    import redis.asyncio as aioredis
+    from aiokafka import AIOKafkaProducer
+
+    parser = argparse.ArgumentParser(description="Binance Live Ingestor")
+    parser.add_argument("--symbols", type=str, default="BTCUSDT,ETHUSDT,SOLUSDT")
+    parser.add_argument("--duration", type=float, default=60.0)
+    parser.add_argument("--kafka-bootstrap", type=str, default="localhost:9094")
+    parser.add_argument("--redis-url", type=str, default="redis://localhost:6379/0")
+    args = parser.parse_args()
+
+    symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+    compression = "lz4" if aiokafka.codec.has_lz4() else None
+    producer = AIOKafkaProducer(
+        bootstrap_servers=args.kafka_bootstrap,
+        compression_type=compression,
+    )
+    await producer.start()
+
+    redis_client = aioredis.from_url(args.redis_url, decode_responses=False)
+    ingestor = BinanceIngestor(kafka_producer=producer, redis_client=redis_client)
+
+    try:
+        count = await ingestor.run_live(symbols=symbols, duration_seconds=args.duration)
+        print(f"Successfully ingested {count} live trades from Binance into Kafka & Redis.")
+    finally:
+        await producer.stop()
+        await redis_client.aclose()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
