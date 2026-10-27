@@ -1,0 +1,4 @@
+<clickhouse>
+    <!-- Resource allocation ceiling for OCI Always Free ARM64 (1.2GB container limit) -->
+    <max_server_memory_usage>1073741824</max_server_memory_usage>
+</clickhouse>
