@@ -284,3 +284,24 @@ class TestDataContracts:
         assert decoded == alert
         assert decoded.logic_version == "surveillance@1.0.0"
         assert decoded.metrics.zscore == 4.6
+
+
+class TestCommonArchitectureBoundary:
+    """Enforce ADR D6 & CONSTRAINTS.md: common/ has zero app dependencies."""
+
+    def test_common_has_zero_app_dependencies(self) -> None:
+        """Verify common modules never import ingestors, spark, backend, or pipelines."""
+        import common.constants
+        import common.contracts
+        import common.crypto
+
+        forbidden_prefixes = ("ingestors", "spark", "clickhouse", "backend", "pipelines")
+        for module in (common.constants, common.contracts, common.crypto):
+            module_name = module.__name__
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if hasattr(attr, "__module__") and attr.__module__:
+                    for prefix in forbidden_prefixes:
+                        assert not attr.__module__.startswith(prefix), (
+                            f"Boundary violation: {module_name} imports {prefix} via {attr_name}"
+                        )

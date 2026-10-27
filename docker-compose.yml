@@ -23,7 +23,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
     ports:
-      - "9094:9094"
+      - "127.0.0.1:9094:9094"
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
@@ -71,8 +71,8 @@ services:
       CLICKHOUSE_USER: default
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
     volumes:
       - ./clickhouse/config/memory.xml:/etc/clickhouse-server/config.d/memory.xml:ro
       - clickhouse_data:/var/lib/clickhouse
@@ -98,7 +98,7 @@ services:
     mem_limit: 256m
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "200mb", "--maxmemory-policy", "allkeys-lru"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
